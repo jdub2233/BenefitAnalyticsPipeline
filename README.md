@@ -54,6 +54,14 @@ The project currently includes:
 - Employee information, departments, benefit plan types, and costs
 - A structured project directory organized around ETL development
 - Git version control and a public GitHub repository
+- Calculates average, minimum, and maximum monthly benefit premiums
+- Calculates total employee monthly benefit contributions
+- Analyzes benefits costs by department and plan type
+- Generates pivot tables with departmental, plan-type, and grand totals
+- Displays financial reports with currency formatting
+- Exports processed benefits cost reports to CSV
+- Validates that report totals reconcile with the original enrollment data
+
 
 ## Project Structure
 
@@ -78,6 +86,26 @@ BenefitAnalyticsPipeline/
 ```
 
 ## Getting Started
+
+
+### Generate Benefits Analytics Report
+
+After generating the sample enrollment data, run:
+
+```bash
+python src/transform/analyze_benefits.py
+```
+
+The script performs the following operations:
+
+- Reads the fictional employee enrollment dataset
+- Calculates premium and employee cost statistics
+- Analyzes enrollment data by department and plan type
+- Generates a pivot table with totals
+- Exports a CSV report to `data/processed/department_benefits_costs.csv`
+- Verifies that the report total matches the source data
+
+The generated CSV is excluded from Git because it can be recreated by running the script.
 
 ### Prerequisites
 
@@ -131,7 +159,7 @@ This CSV contains 20 fictional employee benefits enrollment records.
 - [x] Create synthetic employee enrollment dataset
 - [x] Publish repository to GitHub
 - [ ] Implement pandas data validation and transformations
-- [ ] Create benefits cost analysis reports
+- [x] Create benefits cost analysis reports
 - [ ] Design PostgreSQL schema and SQL queries
 - [ ] Build ETL pipeline
 - [ ] Explore Microsoft Fabric integration

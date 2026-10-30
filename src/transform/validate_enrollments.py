@@ -78,9 +78,61 @@ invalid_records = (
 accepted_df = df[~invalid_records]
 rejected_df = df[invalid_records]
 
+rejected_df = rejected_df.copy()
+rejected_df["rejection_reason"] = ""
+
+rejected_df.loc[
+    rejected_df["employee_id"].isna(),
+    "rejection_reason"
+] = "Missing Employee ID"
+
+def add_rejection_reason(mask, reason):
+    rejected_indexes = df.index[mask]
+
+    matching_indexes = rejected_df.index.intersection(rejected_indexes)
+
+    rejected_df.loc[matching_indexes, "rejection_reason"] += reason + "; "
+
+add_rejection_reason(duplicate_records, "Duplicate Record")
+add_rejection_reason(negative_premiums, "Negative Monthly Premium")
+add_rejection_reason(negative_employee_costs, "Negative Employee Monthly Cost")
+add_rejection_reason(invalid_plan_types, "Invalid Plan Type")
+
+rejected_df["rejection_reason"] = (
+    rejected_df["rejection_reason"].str.rstrip("; ")
+)
+
+# Verify that every input record is accounted for
+assert len(df) == len(accepted_df) + len(rejected_df), \
+    "Validation error: Record counts do not match!"
+
 print("\nENROLLMENT VALIDATION SUMMARY")
 print("-----------------------------")
 print(f"Total Records: {len(df)}")
 print(f"Accepted Records: {len(accepted_df)}")
 print(f"Rejected Records: {len(rejected_df)}")
 
+# Create the output directory if it doesn't exist
+output_dir = BASE_DIR / "data" / "processed"
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# Define output file locations
+accepted_path = output_dir / "accepted_enrollments.csv"
+rejected_path = output_dir / "rejected_enrollments.csv"
+
+# Save the accepted and rejected records to CSV files
+accepted_df.to_csv(accepted_path, index=False)
+rejected_df.to_csv(rejected_path, index=False)
+
+print("\nEXPORT RESULTS")
+print("-----------------------------")
+print(f"Accepted records exported: {len(accepted_df)}")
+print(f"Saved to: {accepted_path}")
+
+print(f"\nRejected records exported: {len(rejected_df)}")
+print(f"Saved to: {rejected_path}")
+
+assert len(df) == len(accepted_df) + len(rejected_df)
+
+print("\nREJECTED RECORDS WITH REASONS")
+print(rejected_df[["employee_id", "employee_name", "rejection_reason"]])

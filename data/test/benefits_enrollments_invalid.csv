@@ -2,7 +2,7 @@ employee_id,employee_name,department,plan_type,monthly_premium,employee_monthly_
 ,Alex Morgan,Engineering,Medical,550,175
 1002,Taylor Reed,Finance,Dental,-85,30
 1003,Jordan Lee,HR,Medical,625,-225
-1004,Casey Brooks,Sales,Auto,45,15
+1004,Casey Brooks,Sales,Auto,-45,15
 1005,Morgan Hayes,Engineering,Medical,700,275
 1006,Riley Parker,Finance,Medical,575,200
 1007,Jamie Carter,HR,Dental,95,35

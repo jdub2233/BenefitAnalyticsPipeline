@@ -6,17 +6,17 @@ An end-to-end data engineering and business intelligence portfolio project focus
 
 ## Project Overview
 
-Benefits Analytics Pipeline is an ongoing portfolio project demonstrating how employee benefits enrollment data can be extracted, validated, transformed, and analyzed using Python and pandas.
+Benefits Analytics Pipeline is an ongoing portfolio project demonstrating how fictional employee benefits enrollment data can be generated, validated, transformed, and analyzed using Python and pandas.
 
-The project is being developed incrementally alongside a structured technical learning curriculum, with future plans to incorporate PostgreSQL, automated ETL pipelines, Microsoft Fabric, and Power BI.
+The project now includes a repeatable, two-stage pipeline that validates enrollment records before generating financial analytics. A single command runs validation followed by analytics, ensuring reports consume accepted records rather than the raw dataset.
 
-It builds on professional experience developing enterprise SaaS applications and working with employee benefits systems.
+The project builds on professional experience developing enterprise SaaS applications and working with employee benefits systems. Future development will incorporate PostgreSQL, more advanced ETL capabilities, Microsoft Fabric, and Power BI.
 
 All employee data used in this project is entirely fictional.
 
 ## Project Goals
 
-- Develop repeatable ETL pipelines using Python and pandas
+- Develop repeatable ETL workflows using Python and pandas
 - Clean, validate, and transform employee benefits enrollment data
 - Store and query structured data using PostgreSQL
 - Explore Microsoft Fabric Lakehouse and data pipelines
@@ -32,17 +32,17 @@ All employee data used in this project is entirely fictional.
 - **Data Processing:** pandas
 - **Data Storage:** CSV files
 - **Development Tools:** Visual Studio Code, Git, GitHub
-- **Data Validation:** pandas filtering, duplicate detection, null checks, and validation rules
-- **Analytics:** pandas aggregations, groupby operations, and pivot tables
+- **Data Validation:** Null checks, duplicate detection, value checks, accepted/rejected record separation, and rejection reasons
+- **Analytics:** pandas aggregations, `groupby`, and pivot tables
+- **Pipeline Orchestration:** Python `subprocess` with sequential execution and failure propagation
 
 ### Planned
 
 - PostgreSQL
 - Microsoft Fabric Lakehouse and data pipelines
-- Power BI
-- DAX
+- Power BI and DAX
 - REST API integrations
-- Automated ETL workflows
+- Expanded ETL orchestration, logging, and error handling
 - Automated testing with pytest
 
 ## Current Functionality
@@ -62,13 +62,13 @@ All employee data used in this project is entirely fictional.
 - Detects negative employee monthly contributions
 - Identifies invalid benefit plan types
 - Separates accepted and rejected enrollment records
-- Assigns descriptive rejection reasons to rejected records
-- Supports multiple rejection reasons for a single record
+- Assigns descriptive rejection reasons, including multiple reasons for a single record
 - Exports accepted and rejected records to separate CSV files
-- Verifies that accepted and rejected record counts reconcile with the source dataset
+- Verifies that accepted and rejected record counts reconcile with the input dataset
 
 ### Benefits Cost Analytics
 
+- Reads **accepted enrollment records**, not the raw enrollment CSV
 - Calculates average, minimum, and maximum monthly benefit premiums
 - Calculates total employee monthly benefit contributions
 - Analyzes benefit costs by department and plan type
@@ -76,9 +76,16 @@ All employee data used in this project is entirely fictional.
 - Generates pivot tables showing departmental, plan-type, and grand totals
 - Displays financial reports with currency formatting
 - Exports departmental benefits cost reports to CSV
-- Verifies that calculated report totals reconcile with the source data
+- Verifies that calculated report totals reconcile with the accepted data
 
-**Current limitation:** Data validation and benefits cost analytics operate as separate scripts. The analytics script currently reads the original enrollment dataset rather than the accepted records produced by validation. Integrating these operations is the next development milestone.
+### Two-Stage Pipeline Runner
+
+The `src/run_pipeline.py` entry point runs both processing stages in order:
+
+1. **Validation:** Reads the normal raw enrollment dataset, applies validation rules, and exports accepted and rejected records.
+2. **Analytics:** Reads the newly generated accepted records, calculates benefit cost statistics, and exports a departmental cost report.
+
+The runner uses `subprocess.run(..., check=True)` so a nonzero exit status from validation stops the pipeline before analytics begins. Rejected enrollment records are handled as expected data-quality outcomes and do not, by themselves, cause the script to fail.
 
 ## Project Structure
 
@@ -89,7 +96,7 @@ BenefitAnalyticsPipeline/
 │   │   └── benefits_enrollments.csv
 │   ├── test/
 │   │   └── benefits_enrollments_invalid.csv
-│   └── processed/
+│   └── processed/                         # Generated outputs (not tracked)
 │       ├── accepted_enrollments.csv
 │       ├── rejected_enrollments.csv
 │       └── department_benefits_costs.csv
@@ -99,17 +106,18 @@ BenefitAnalyticsPipeline/
 │   ├── transform/
 │   │   ├── analyze_benefits.py
 │   │   └── validate_enrollments.py
-│   └── load/
-├── sql/
-├── notebooks/
-├── tests/
-├── docs/
+│   ├── load/                              # Reserved for future database loading
+│   └── run_pipeline.py
+├── sql/                                   # Planned database scripts
+├── notebooks/                             # Reserved for exploration
+├── tests/                                 # Planned automated tests
+├── docs/                                  # Planned architecture documentation
 ├── README.md
 ├── requirements.txt
 └── .gitignore
 ```
 
-Files under `data/processed/` are generated outputs and may not be present in a fresh clone of the repository. They are recreated by running the appropriate scripts.
+The folders marked as planned or reserved represent the intended project organization and may be empty or absent from a fresh clone. Files under `data/processed/` are generated outputs, excluded from Git tracking, and recreated when the pipeline runs.
 
 ## Getting Started
 
@@ -142,35 +150,65 @@ Windows PowerShell:
 .\.venv\Scripts\Activate.ps1
 ```
 
+macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
 **4. Install dependencies**
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-All commands below assume that the virtual environment is activated and that you are running them from the project root directory.
+All commands below assume the virtual environment is activated and commands are run from the project root.
+
+### Run the Complete Pipeline
+
+**Recommended way to run the project:**
+
+```bash
+python src/run_pipeline.py
+```
+
+This single command:
+
+1. Validates `data/raw/benefits_enrollments.csv`.
+2. Writes accepted and rejected records to `data/processed/`.
+3. Runs analytics using only `data/processed/accepted_enrollments.csv`.
+4. Exports `data/processed/department_benefits_costs.csv`.
+5. Checks that the analytics report total reconciles with the accepted enrollment data.
+
+The runner stops if either script exits with an error. The current runner processes the **default raw dataset**; it does not yet accept a custom input-file argument.
+
+**Expected results for the normal sample dataset:**
+
+| Metric | Expected result |
+|---|---:|
+| Source records | 20 |
+| Accepted records | 20 |
+| Rejected records | 0 |
+| Total employee monthly cost | $2,273.00 |
+| Average monthly premium | $316.15 |
+
+The pipeline should end with `PIPELINE COMPLETED SUCCESSFULLY`.
 
 ### Generate Sample Data
 
-Run the dataset generator:
+To regenerate the normal fictional enrollment dataset:
 
 ```bash
 python src/extract/generate_sample_data.py
 ```
 
-The script generates:
+This creates `data/raw/benefits_enrollments.csv` with 20 fictional enrollment records. Run the complete pipeline afterward to refresh the processed outputs.
 
-`data/raw/benefits_enrollments.csv`
+## Data Validation
 
-This dataset contains 20 fictional employee benefits enrollment records.
+### Validation Rules
 
-### Data Validation Pipeline
-
-The project includes a pandas-based data validation script that identifies invalid employee benefit enrollment records before downstream processing.
-
-#### Validation Rules
-
-| Validation Rule | Description |
+| Validation rule | Description |
 |---|---|
 | Missing Employee ID | Reject records without an employee identifier |
 | Duplicate Enrollment | Reject records sharing the same employee ID and benefit plan type |
@@ -178,49 +216,35 @@ The project includes a pandas-based data validation script that identifies inval
 | Negative Employee Cost | Reject records with a negative employee monthly contribution |
 | Invalid Plan Type | Reject records containing unsupported benefit plan types |
 
-Supported benefit plan types are:
+Supported benefit plan types are **Medical**, **Dental**, and **Vision**.
 
-- Medical
-- Dental
-- Vision
+Records that fail one or more checks are separated from accepted records and assigned descriptive rejection reasons. When multiple rules fail, their reasons are combined in the `rejection_reason` field.
 
-Records that fail validation are separated from accepted records and assigned descriptive rejection reasons.
+### Run Validation Independently
 
-If a record violates multiple validation rules, its rejection reasons are combined into a single field.
-
-#### Running the Validation Pipeline
-
-**Validate the normal enrollment dataset:**
+Validate the normal enrollment dataset:
 
 ```bash
 python src/transform/validate_enrollments.py
 ```
 
-**Validate the intentionally invalid test dataset:**
+Validate the intentionally invalid test dataset:
 
 ```bash
 python src/transform/validate_enrollments.py data/test/benefits_enrollments_invalid.csv
 ```
 
-The script accepts an optional CSV file path. If no path is provided, it uses the default dataset in `data/raw/`.
+The validation script accepts an optional CSV path. If omitted, it uses `data/raw/benefits_enrollments.csv`.
 
-#### Output Files
+### Validation Output Files
 
-The validation pipeline generates two files:
+**Accepted enrollments:** `data/processed/accepted_enrollments.csv`
 
-**Accepted Enrollments**
+Contains records that passed every implemented validation rule.
 
-`data/processed/accepted_enrollments.csv`
+**Rejected enrollments:** `data/processed/rejected_enrollments.csv`
 
-Contains enrollment records that passed all validation checks.
-
-**Rejected Enrollments**
-
-`data/processed/rejected_enrollments.csv`
-
-Contains enrollment records that failed one or more validation checks.
-
-Rejected records include a `rejection_reason` column explaining why each record was rejected.
+Contains records that failed at least one rule, including a `rejection_reason` column.
 
 Example rejection reasons:
 
@@ -233,57 +257,96 @@ Invalid Plan Type
 Negative Monthly Premium; Invalid Plan Type
 ```
 
-#### Validation Testing
+### Validation Testing
 
-A separate synthetic test dataset is maintained at:
+The synthetic test dataset is stored at `data/test/benefits_enrollments_invalid.csv`. It includes missing employee identifiers, duplicate enrollments, negative premiums, negative employee costs, invalid plan types, and a record with multiple failures.
 
-`data/test/benefits_enrollments_invalid.csv`
-
-This dataset intentionally contains invalid records to verify the validation logic.
-
-The current test dataset contains 21 enrollment records.
-
-| Validation Result | Record Count |
+| Validation result | Record count |
 |---|---:|
-| Total Records | 21 |
-| Accepted Records | 15 |
-| Rejected Records | 6 |
+| Total records | 21 |
+| Accepted records | 15 |
+| Rejected records | 6 |
 
-The test dataset includes examples of missing employee identifiers, duplicate enrollments, negative costs, invalid benefit plan types, and records with multiple validation failures.
-
-The script includes a reconciliation assertion to ensure that every input record is accounted for:
+The validation script includes a record-count reconciliation assertion:
 
 ```python
 assert len(df) == len(accepted_df) + len(rejected_df)
 ```
 
-This prevents records from being unintentionally lost during the validation process.
+This confirms that each input record is accounted for in either the accepted or rejected output.
 
-### Generate Benefits Analytics Report
+## Benefits Analytics
 
-After generating the sample enrollment data, run:
+### Run Analytics Independently
+
+First run validation so the accepted-enrollment file exists and reflects the intended input:
 
 ```bash
+python src/transform/validate_enrollments.py
 python src/transform/analyze_benefits.py
 ```
 
-The script performs the following operations:
+The analytics script:
 
-1. Reads the fictional employee enrollment dataset
-2. Calculates premium and employee cost statistics
-3. Analyzes enrollment data by department and plan type
-4. Counts enrollments by benefit plan type
-5. Generates a pivot table containing departmental and plan-type totals
-6. Exports a CSV report
-7. Verifies that the report total matches the source data
+1. Reads `data/processed/accepted_enrollments.csv`.
+2. Calculates premium and employee cost statistics.
+3. Analyzes accepted enrollments by department and plan type.
+4. Counts enrollments by benefit plan type.
+5. Generates a pivot table containing departmental and plan-type totals.
+6. Exports a CSV report.
+7. Verifies that the report total matches the accepted data.
 
-The generated report is saved to:
+The generated report is saved to `data/processed/department_benefits_costs.csv`.
 
-`data/processed/department_benefits_costs.csv`
+**Important:** Running analytics by itself reads the most recently generated accepted CSV, which may be stale. Prefer `python src/run_pipeline.py` for the normal workflow because it regenerates validated records immediately before analytics.
 
-Generated reports are excluded from Git because they can be recreated by running the scripts.
+## End-to-End Integration Test
 
-**Note:** The analytics script currently processes the original enrollment dataset. Integrating validated enrollment records into the reporting workflow is planned for the next development milestone.
+The pipeline was tested against both the normal dataset and the intentionally invalid dataset.
+
+### Test Invalid Enrollment Data
+
+Run validation using the test dataset, then analyze the accepted records:
+
+```bash
+python src/transform/validate_enrollments.py data/test/benefits_enrollments_invalid.csv
+python src/transform/analyze_benefits.py
+```
+
+**Verified results:**
+
+| Metric | Normal dataset | Invalid-data test |
+|---|---:|---:|
+| Input records | 20 | 21 |
+| Records analyzed | 20 | 15 |
+| Rejected records | 0 | 6 |
+| Average monthly premium | $316.15 | $287.87 |
+| Total employee monthly cost | $2,273.00 | $1,553.00 |
+| Financial reconciliation | Passed | Passed |
+
+This demonstrates that invalid records are excluded from downstream analytics. The test is currently run manually; automated regression tests are planned.
+
+**Note:** Running the validator with the invalid test dataset overwrites the generated accepted/rejected CSVs, and the analytics script overwrites the generated cost report.
+
+### Restore Normal Reports After Testing
+
+Run:
+
+```bash
+python src/run_pipeline.py
+```
+
+This regenerates the processed outputs from the normal 20-record dataset and restores the expected $2,273.00 employee monthly cost total.
+
+### Generated Outputs
+
+The normal pipeline creates:
+
+- `data/processed/accepted_enrollments.csv`
+- `data/processed/rejected_enrollments.csv`
+- `data/processed/department_benefits_costs.csv`
+
+Generated CSV files are excluded from Git tracking and can be recreated at any time.
 
 ## Development Roadmap
 
@@ -302,15 +365,18 @@ Generated reports are excluded from Git because they can be recreated by running
 - [x] Export accepted and rejected enrollment records
 - [x] Implement rejection reason reporting
 - [x] Support multiple rejection reasons per record
-- [x] Add record count reconciliation checks
-- [ ] Integrate validated enrollment data into analytics reports
+- [x] Add record-count reconciliation checks
+- [x] Integrate validated enrollment data into analytics reports
+- [x] Implement a two-stage pipeline runner
+- [x] Verify integration using intentionally invalid enrollment data
+- [x] Add financial reconciliation checks
 
 ### Phase 3: Database and ETL Development
 
 - [ ] Design PostgreSQL database schema
 - [ ] Develop SQL queries for benefits analytics
 - [ ] Load validated enrollment data into PostgreSQL
-- [ ] Build a repeatable ETL pipeline
+- [ ] Extend the ETL workflow to include database loading
 
 ### Phase 4: Cloud and Business Intelligence
 
@@ -322,7 +388,7 @@ Generated reports are excluded from Git because they can be recreated by running
 ### Phase 5: Integration and Software Engineering
 
 - [ ] Integrate external data through REST APIs
-- [ ] Add automated tests
+- [ ] Add automated tests with pytest
 - [ ] Add architecture documentation
 - [ ] Improve error handling and logging
 
@@ -338,12 +404,10 @@ No real employee records or protected health information are used.
 
 **Started:** October 26, 2026
 
-**Latest Progress:** October 30, 2026
+**Latest Progress:** November 3, 2026
 
-The project currently supports synthetic enrollment data generation, pandas-based validation with rejection reporting, and departmental benefits cost analysis.
+The project currently supports synthetic enrollment data generation, data-quality validation with rejection reporting, accepted-record-only financial analytics, CSV report generation, and a working two-stage pipeline executed with one command.
 
-The next development milestone is to integrate the validation and analytics workflows so that benefits cost reports use accepted enrollment records rather than unvalidated source data.
-
-Future development will introduce PostgreSQL, repeatable ETL pipelines, Microsoft Fabric, Power BI, and additional software engineering practices.
+The next major development phase is PostgreSQL database design and loading validated enrollment data into relational tables. Future work will expand the ETL workflow and introduce Microsoft Fabric, Power BI, automated testing, and REST API integrations.
 
 This repository will be updated as new data engineering and analytics capabilities are implemented.

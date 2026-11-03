@@ -1,15 +1,22 @@
-
 from pathlib import Path
 import pandas as pd
 
 # Identify the project root directory
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Locate the original enrollment dataset
-INPUT_FILE = PROJECT_ROOT / "data" / "raw" / "benefits_enrollments.csv"
+# Locate the validated enrollment dataset
+INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "accepted_enrollments.csv"
 
-# Load the CSV into a pandas DataFrame
+# Ensure validated enrollment data exists
+if not INPUT_FILE.exists():
+    raise FileNotFoundError(
+        "Validated enrollment data not found. "
+        "Run validate_enrollments.py before running analytics."
+    )
+
+# Load only accepted enrollment records
 benefits = pd.read_csv(INPUT_FILE)
+  
 
 print("====================================")
 print("      BENEFITS ANALYTICS REPORT     ")

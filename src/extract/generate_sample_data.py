@@ -29,6 +29,7 @@ employees = [
     (1018, "Rowan Scott", "Finance", "Dental", 105, 42),
     (1019, "Finley Adams", "HR", "Medical", 580, 195),
     (1020, "Dakota Ellis", "Sales", "Vision", 48, 16),
+    (1001, "Alex Morgan", "Engineering", "Dental", 85, 30),
 ]
 
 columns = [
@@ -45,8 +46,10 @@ df = pd.DataFrame(employees, columns=columns)
 
 # Assign a stable identifier to each source enrollment
 df["source_enrollment_id"] = [
-    f"ENR-{employee_id}-2026"
-    for employee_id in df["employee_id"]
+    f"ENR-{row.employee_id}-2026"
+    if index < 20
+    else f"ENR-{row.employee_id}-{row.plan_type.upper()}-2026"
+    for index, row in df.iterrows()
 ]
 
 # Coverage start date for the 2026 enrollment period

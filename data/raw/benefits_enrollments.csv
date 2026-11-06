@@ -19,3 +19,4 @@ employee_id,employee_name,department,plan_type,monthly_premium,employee_monthly_
 1018,Rowan Scott,Finance,Dental,105,42,ENR-1018-2026,2026-01-01
 1019,Finley Adams,HR,Medical,580,195,ENR-1019-2026,2026-01-01
 1020,Dakota Ellis,Sales,Vision,48,16,ENR-1020-2026,2026-01-01
+1001,Alex Morgan,Engineering,Dental,85,30,ENR-1001-DENTAL-2026,2026-01-01

@@ -136,7 +136,9 @@ enrollments_to_load = enrollments_with_plan_ids[
         "employee_id",
         "plan_id",
         "monthly_premium",
-        "employee_monthly_cost"
+        "employee_monthly_cost",
+        "source_enrollment_id",
+        "effective_date"
     ]
 ].copy()
 
@@ -159,9 +161,12 @@ insert_sql = """
         employee_id,
         plan_id,
         monthly_premium,
-        employee_monthly_cost
+        employee_monthly_cost,
+        source_enrollment_id,
+        effective_date
     )
-    VALUES (%s, %s, %s, %s);
+    VALUES (%s, %s, %s, %s, %s, %s)
+    ON CONFLICT (source_enrollment_id) DO NOTHING;
 """
 # Connect to PostgreSQL and insert enrollments
 with psycopg.connect(
@@ -173,29 +178,25 @@ with psycopg.connect(
 
     with conn.cursor() as cursor:
 
-        # Prevent accidental duplicate loads
+        # Count enrollments before loading
         cursor.execute("SELECT COUNT(*) FROM enrollments;")
-        existing_count = cursor.fetchone()[0]
+        count_before = cursor.fetchone()[0]
 
-        if existing_count > 0:
-            raise ValueError(
-                f"Enrollment table already contains {existing_count} records. "
-                "Load cancelled to prevent duplicates."
-            )
-
-        # Insert all validated enrollment records
+        # Insert new enrollments, skipping existing source IDs
         cursor.executemany(insert_sql, records_to_insert)
 
-        # Verify the number of records inserted
+        # Count enrollments after loading
         cursor.execute("SELECT COUNT(*) FROM enrollments;")
-        inserted_count = cursor.fetchone()[0]
+        count_after = cursor.fetchone()[0]
 
-        if inserted_count != len(records_to_insert):
-            raise ValueError(
-                f"Expected {len(records_to_insert)} records, "
-                f"but found {inserted_count}."
-            )
+        # Calculate loading results
+        inserted_count = count_after - count_before
+        skipped_count = len(records_to_insert) - inserted_count
 
-    # Transaction commits automatically when the connection block succeeds
-
-print(f"\nSuccessfully loaded {inserted_count} enrollments into PostgreSQL.")
+# Transaction commits automatically when the connection block succeeds
+print("\nENROLLMENT LOADING SUMMARY")
+print("--------------------------")
+print(f"Records processed: {len(records_to_insert)}")
+print(f"New enrollments inserted: {inserted_count}")
+print(f"Existing enrollments skipped: {skipped_count}")
+print(f"Total enrollments in PostgreSQL: {count_after}")

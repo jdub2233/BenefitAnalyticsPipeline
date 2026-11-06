@@ -28,9 +28,9 @@ records_with_missing_ids = df[df["employee_id"].isna()]
 print("\nRecords with Missing Employee IDs:")
 print(records_with_missing_ids)
 
-
+# Identify duplicate source enrollment records
 duplicate_records = df.duplicated(
-    subset=["employee_id", "plan_type"],
+    subset=["source_enrollment_id"],
     keep=False
 )
 
@@ -67,9 +67,30 @@ records_with_invalid_plans = df[invalid_plan_types]
 print("\nRecords with Invalid Plan Types:")
 print(records_with_invalid_plans)
 
+# Identify missing or blank source enrollment IDs
+missing_source_ids = (
+    df["source_enrollment_id"].isna()
+    | df["source_enrollment_id"].astype("string").str.strip().eq("").fillna(False)
+)
+
+print(f"\nMissing Source Enrollment IDs: {missing_source_ids.sum()}")
+
+# Validate enrollment effective dates
+parsed_effective_dates = pd.to_datetime(
+    df["effective_date"],
+    format="%Y-%m-%d",
+    errors="coerce"
+)
+
+invalid_effective_dates = parsed_effective_dates.isna()
+
+print(f"\nInvalid Effective Dates: {invalid_effective_dates.sum()}")
+
 invalid_records = (
     df["employee_id"].isna()
+    | missing_source_ids
     | duplicate_records
+    | invalid_effective_dates
     | negative_premiums
     | negative_employee_costs
     | invalid_plan_types
@@ -93,7 +114,9 @@ def add_rejection_reason(mask, reason):
 
     rejected_df.loc[matching_indexes, "rejection_reason"] += reason + "; "
 
+add_rejection_reason(missing_source_ids, "Missing Source Enrollment ID")
 add_rejection_reason(duplicate_records, "Duplicate Record")
+add_rejection_reason(invalid_effective_dates, "Invalid Effective Date")
 add_rejection_reason(negative_premiums, "Negative Monthly Premium")
 add_rejection_reason(negative_employee_costs, "Negative Employee Monthly Cost")
 add_rejection_reason(invalid_plan_types, "Invalid Plan Type")

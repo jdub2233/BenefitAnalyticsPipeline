@@ -85,18 +85,14 @@ run_step("Verify Benefit Plans", BENEFIT_PLANS_SCRIPT)
 print("\nBenefit plan verification completed successfully.")
 
 # Step 6: Load enrollments into PostgreSQL
-"""print("\nSTEP 6: Loading enrollments into PostgreSQL...")
+print("\nSTEP 6: Loading enrollments into PostgreSQL...")
 
-subprocess.run(
-    [sys.executable, str(ENROLLMENTS_SCRIPT)],
-    check=True,
-    cwd=PROJECT_ROOT
-)
+run_step("Load Enrollments", ENROLLMENTS_SCRIPT)
 
-print("\nEnrollment loading completed successfully.")"""
+print("\nEnrollment loading completed successfully.")
 
 
 print("\n===================================")
-print("    PIPELINE STAGES 1-5 COMPLETED SUCCESSFULLY")
+print("    PIPELINE STAGES 1-6 COMPLETED SUCCESSFULLY")
 print("===================================")
 

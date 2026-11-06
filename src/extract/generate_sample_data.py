@@ -43,6 +43,15 @@ columns = [
 # Convert the employee records into a pandas DataFrame
 df = pd.DataFrame(employees, columns=columns)
 
+# Assign a stable identifier to each source enrollment
+df["source_enrollment_id"] = [
+    f"ENR-{employee_id}-2026"
+    for employee_id in df["employee_id"]
+]
+
+# Coverage start date for the 2026 enrollment period
+df["effective_date"] = "2026-01-01"
+
 # Ensure the destination folder exists
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 

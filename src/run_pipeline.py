@@ -15,6 +15,10 @@ EMPLOYEES_SCRIPT = PROJECT_ROOT / "src" / "load" / "load_employees.py"
 BENEFIT_PLANS_SCRIPT = PROJECT_ROOT / "src" / "load" / "load_benefit_plans.py"
 ENROLLMENTS_SCRIPT = PROJECT_ROOT / "src" / "load" / "load_enrollments.py"
 
+# Reconciliation script
+RECONCILIATION_SCRIPT = PROJECT_ROOT / "src" / "validation" / "reconcile_enrollments.py"
+
+
 def run_step(step_name, script_path):
     """Execute a pipeline step and stop if it fails."""
     try:
@@ -92,7 +96,18 @@ run_step("Load Enrollments", ENROLLMENTS_SCRIPT)
 print("\nEnrollment loading completed successfully.")
 
 
+# Step 7: Reconcile PostgreSQL enrollments
+print("\nSTEP 7: Reconciling PostgreSQL enrollment data...")
+
+run_step(
+    "Reconcile Enrollments",
+    RECONCILIATION_SCRIPT
+)
+
+print("\nEnrollment reconciliation completed successfully.")
+
+
 print("\n===================================")
-print("    PIPELINE STAGES 1-6 COMPLETED SUCCESSFULLY")
+print("    PIPELINE STAGES 1-7 COMPLETED SUCCESSFULLY")
 print("===================================")
 

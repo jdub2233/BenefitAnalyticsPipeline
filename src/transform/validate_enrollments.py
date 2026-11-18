@@ -4,158 +4,171 @@ import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-if len(sys.argv) > 1:
-    csv_path = Path(sys.argv[1])
-    if not csv_path.is_absolute():
-        csv_path = BASE_DIR / csv_path
-else:
-    csv_path = BASE_DIR / "data" / "raw" / "benefits_enrollments.csv"
+def validate_enrollments(df):
+    missing_ids = df["employee_id"].isna().sum()
+    print(f"\nMissing Employee IDs: {missing_ids}")
 
-df = pd.read_csv(csv_path)
+    records_with_missing_ids = df[df["employee_id"].isna()]
+    print("\nRecords with Missing Employee IDs:")
+    print(records_with_missing_ids)
 
-print("ALL ENROLLMENT DATA")
-print("---------------------")
-print(df)
+    # Identify duplicate source enrollment records
+    duplicate_records = df.duplicated(
+        subset=["source_enrollment_id"],
+        keep=False
+    )
 
-print("BENEFITS DATA VALIDATION")
-print("------------------------")
-print(f"Total Records: {len(df)}")
+    duplicate_count = duplicate_records.sum()
 
-missing_ids = df["employee_id"].isna().sum()
-print(f"\nMissing Employee IDs: {missing_ids}")
+    print(f"\nDuplicate Enrollment Records: {duplicate_count}")
 
-records_with_missing_ids = df[df["employee_id"].isna()]
-print("\nRecords with Missing Employee IDs:")
-print(records_with_missing_ids)
+    records_with_duplicates = df[duplicate_records]
+    print("\nRecords with Duplicate Enrollment Records:")
+    print(records_with_duplicates)
 
-# Identify duplicate source enrollment records
-duplicate_records = df.duplicated(
-    subset=["source_enrollment_id"],
-    keep=False
-)
+    negative_premiums = df["monthly_premium"] < 0
 
-duplicate_count = duplicate_records.sum()
+    negative_premium_count = negative_premiums.sum()
 
-print(f"\nDuplicate Enrollment Records: {duplicate_count}")
+    print(f"\nNegative Monthly Premiums: {negative_premium_count}")
 
-records_with_duplicates = df[duplicate_records]
-print("\nRecords with Duplicate Enrollment Records:")
-print(records_with_duplicates)
+    records_with_negative_premiums = df[negative_premiums]
+    print("\nRecords with Negative Monthly Premiums:")  
+    print(records_with_negative_premiums)
 
-negative_premiums = df["monthly_premium"] < 0
+    negative_employee_costs = df["employee_monthly_cost"] < 0
+    negative_employee_cost_count = negative_employee_costs.sum()
+    print(f"\nNegative Employee Monthly Costs: {negative_employee_cost_count}")
+    records_with_negative_employee_costs = df[negative_employee_costs]
+    print("\nRecords with Negative Employee Monthly Costs:")
+    print(records_with_negative_employee_costs)
 
-negative_premium_count = negative_premiums.sum()
+    valid_plan_types = ["Medical", "Dental", "Vision"]
+    invalid_plan_types = ~df["plan_type"].isin(valid_plan_types)
+    invalid_plan_count = invalid_plan_types.sum()
+    print(f"\nInvalid Plan Types: {invalid_plan_count}")
+    records_with_invalid_plans = df[invalid_plan_types]
+    print("\nRecords with Invalid Plan Types:")
+    print(records_with_invalid_plans)
 
-print(f"\nNegative Monthly Premiums: {negative_premium_count}")
+    # Identify missing or blank source enrollment IDs
+    missing_source_ids = (
+        df["source_enrollment_id"].isna()
+        | df["source_enrollment_id"].astype("string").str.strip().eq("").fillna(False)
+    )
 
-records_with_negative_premiums = df[negative_premiums]
-print("\nRecords with Negative Monthly Premiums:")  
-print(records_with_negative_premiums)
+    print(f"\nMissing Source Enrollment IDs: {missing_source_ids.sum()}")
 
-negative_employee_costs = df["employee_monthly_cost"] < 0
-negative_employee_cost_count = negative_employee_costs.sum()
-print(f"\nNegative Employee Monthly Costs: {negative_employee_cost_count}")
-records_with_negative_employee_costs = df[negative_employee_costs]
-print("\nRecords with Negative Employee Monthly Costs:")
-print(records_with_negative_employee_costs)
+    # Validate enrollment effective dates
+    parsed_effective_dates = pd.to_datetime(
+        df["effective_date"],
+        format="%Y-%m-%d",
+        errors="coerce"
+    )
 
-valid_plan_types = ["Medical", "Dental", "Vision"]
-invalid_plan_types = ~df["plan_type"].isin(valid_plan_types)
-invalid_plan_count = invalid_plan_types.sum()
-print(f"\nInvalid Plan Types: {invalid_plan_count}")
-records_with_invalid_plans = df[invalid_plan_types]
-print("\nRecords with Invalid Plan Types:")
-print(records_with_invalid_plans)
+    invalid_effective_dates = parsed_effective_dates.isna()
 
-# Identify missing or blank source enrollment IDs
-missing_source_ids = (
-    df["source_enrollment_id"].isna()
-    | df["source_enrollment_id"].astype("string").str.strip().eq("").fillna(False)
-)
+    print(f"\nInvalid Effective Dates: {invalid_effective_dates.sum()}")
 
-print(f"\nMissing Source Enrollment IDs: {missing_source_ids.sum()}")
+    invalid_records = (
+        df["employee_id"].isna()
+        | missing_source_ids
+        | duplicate_records
+        | invalid_effective_dates
+        | negative_premiums
+        | negative_employee_costs
+        | invalid_plan_types
+    )
 
-# Validate enrollment effective dates
-parsed_effective_dates = pd.to_datetime(
-    df["effective_date"],
-    format="%Y-%m-%d",
-    errors="coerce"
-)
+    accepted_df = df[~invalid_records]
+    rejected_df = df[invalid_records]
 
-invalid_effective_dates = parsed_effective_dates.isna()
+    rejected_df = rejected_df.copy()
+    rejected_df["rejection_reason"] = ""
 
-print(f"\nInvalid Effective Dates: {invalid_effective_dates.sum()}")
+    rejected_df.loc[
+        rejected_df["employee_id"].isna(),
+        "rejection_reason"
+    ] = "Missing Employee ID"
 
-invalid_records = (
-    df["employee_id"].isna()
-    | missing_source_ids
-    | duplicate_records
-    | invalid_effective_dates
-    | negative_premiums
-    | negative_employee_costs
-    | invalid_plan_types
-)
+    def add_rejection_reason(mask, reason):
+        rejected_indexes = df.index[mask]
 
-accepted_df = df[~invalid_records]
-rejected_df = df[invalid_records]
+        matching_indexes = rejected_df.index.intersection(rejected_indexes)
 
-rejected_df = rejected_df.copy()
-rejected_df["rejection_reason"] = ""
+        rejected_df.loc[matching_indexes, "rejection_reason"] += reason + "; "
 
-rejected_df.loc[
-    rejected_df["employee_id"].isna(),
-    "rejection_reason"
-] = "Missing Employee ID"
+    add_rejection_reason(missing_source_ids, "Missing Source Enrollment ID")
+    add_rejection_reason(duplicate_records, "Duplicate Record")
+    add_rejection_reason(invalid_effective_dates, "Invalid Effective Date")
+    add_rejection_reason(negative_premiums, "Negative Monthly Premium")
+    add_rejection_reason(negative_employee_costs, "Negative Employee Monthly Cost")
+    add_rejection_reason(invalid_plan_types, "Invalid Plan Type")
 
-def add_rejection_reason(mask, reason):
-    rejected_indexes = df.index[mask]
+    rejected_df["rejection_reason"] = (
+        rejected_df["rejection_reason"].str.rstrip("; ")
+    )
 
-    matching_indexes = rejected_df.index.intersection(rejected_indexes)
+    return accepted_df, rejected_df
 
-    rejected_df.loc[matching_indexes, "rejection_reason"] += reason + "; "
+def main():
+    if len(sys.argv) > 1:
+        csv_path = Path(sys.argv[1])
+        if not csv_path.is_absolute():
+            csv_path = BASE_DIR / csv_path
+    else:
+        csv_path = BASE_DIR / "data" / "raw" / "benefits_enrollments.csv"
 
-add_rejection_reason(missing_source_ids, "Missing Source Enrollment ID")
-add_rejection_reason(duplicate_records, "Duplicate Record")
-add_rejection_reason(invalid_effective_dates, "Invalid Effective Date")
-add_rejection_reason(negative_premiums, "Negative Monthly Premium")
-add_rejection_reason(negative_employee_costs, "Negative Employee Monthly Cost")
-add_rejection_reason(invalid_plan_types, "Invalid Plan Type")
+    df = pd.read_csv(csv_path)
 
-rejected_df["rejection_reason"] = (
-    rejected_df["rejection_reason"].str.rstrip("; ")
-)
+    print("ALL ENROLLMENT DATA")
+    print("---------------------")
+    print(df)
 
-# Verify that every input record is accounted for
-assert len(df) == len(accepted_df) + len(rejected_df), \
-    "Validation error: Record counts do not match!"
+    print("BENEFITS DATA VALIDATION")
+    print("------------------------")
+    print(f"Total Records: {len(df)}")
 
-print("\nENROLLMENT VALIDATION SUMMARY")
-print("-----------------------------")
-print(f"Total Records: {len(df)}")
-print(f"Accepted Records: {len(accepted_df)}")
-print(f"Rejected Records: {len(rejected_df)}")
 
-# Create the output directory if it doesn't exist
-output_dir = BASE_DIR / "data" / "processed"
-output_dir.mkdir(parents=True, exist_ok=True)
+    accepted_df, rejected_df = validate_enrollments(df)
 
-# Define output file locations
-accepted_path = output_dir / "accepted_enrollments.csv"
-rejected_path = output_dir / "rejected_enrollments.csv"
 
-# Save the accepted and rejected records to CSV files
-accepted_df.to_csv(accepted_path, index=False)
-rejected_df.to_csv(rejected_path, index=False)
+    # Verify that every input record is accounted for
+    assert len(df) == len(accepted_df) + len(rejected_df), \
+        "Validation error: Record counts do not match!"
 
-print("\nEXPORT RESULTS")
-print("-----------------------------")
-print(f"Accepted records exported: {len(accepted_df)}")
-print(f"Saved to: {accepted_path}")
+    print("\nENROLLMENT VALIDATION SUMMARY")
+    print("-----------------------------")
+    print(f"Total Records: {len(df)}")
+    print(f"Accepted Records: {len(accepted_df)}")
+    print(f"Rejected Records: {len(rejected_df)}")
 
-print(f"\nRejected records exported: {len(rejected_df)}")
-print(f"Saved to: {rejected_path}")
+    # Create the output directory if it doesn't exist
+    output_dir = BASE_DIR / "data" / "processed"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-assert len(df) == len(accepted_df) + len(rejected_df)
+    # Define output file locations
+    accepted_path = output_dir / "accepted_enrollments.csv"
+    rejected_path = output_dir / "rejected_enrollments.csv"
 
-print("\nREJECTED RECORDS WITH REASONS")
-print(rejected_df[["employee_id", "employee_name", "rejection_reason"]])
+    # Save the accepted and rejected records to CSV files
+    accepted_df.to_csv(accepted_path, index=False)
+    rejected_df.to_csv(rejected_path, index=False)
+
+    print("\nEXPORT RESULTS")
+    print("-----------------------------")
+    print(f"Accepted records exported: {len(accepted_df)}")
+    print(f"Saved to: {accepted_path}")
+
+    print(f"\nRejected records exported: {len(rejected_df)}")
+    print(f"Saved to: {rejected_path}")
+
+    assert len(df) == len(accepted_df) + len(rejected_df)
+
+    print("\nREJECTED RECORDS WITH REASONS")
+    print(rejected_df[["employee_id", "employee_name", "rejection_reason"]])
+
+
+if __name__ == "__main__":
+    main()
+

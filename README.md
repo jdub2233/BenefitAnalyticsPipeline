@@ -1,5 +1,7 @@
 # Benefits Analytics Pipeline
 
+[![Python Unit Tests](https://github.com/jdub2233/BenefitAnalyticsPipeline/actions/workflows/python-tests.yml/badge.svg)](https://github.com/jdub2233/BenefitAnalyticsPipeline/actions/workflows/python-tests.yml)
+
 An end-to-end data engineering and business intelligence portfolio project focused on employee benefits enrollment and cost analysis.
 
 **Project Status:** Active Development
@@ -25,8 +27,9 @@ The pipeline:
 6. Reconciles PostgreSQL enrollment records against the accepted CSV.
 7. Reports pipeline success or failure.
 
-The project also includes seven automated pytest tests covering
-core enrollment validation rules.
+The project includes seven automated pytest validation unit tests, one
+PostgreSQL enrollment-loading integration test, and GitHub Actions
+continuous integration (CI) for automatic unit testing.
 
 An interactive Power BI dashboard provides enrollment and premium
 analytics using the processed CSV data. Power BI is not yet
@@ -66,7 +69,8 @@ All employee data is entirely fictional.
   execution and failure propagation
 - **Data Integrity:** PostgreSQL reconciliation against accepted
   CSV records and idempotent enrollment loading
-- **Automated Testing:** pytest
+- **Automated Testing:** pytest unit tests and PostgreSQL integration testing
+- **Continuous Integration:** GitHub Actions (Python 3.13)
 - **Business Intelligence:** Microsoft Power BI Desktop
 - **Data Modeling and Calculations:** Power BI and DAX
 - **Development Tools:** Visual Studio Code, Git, GitHub
@@ -173,7 +177,8 @@ BenefitAnalyticsPipeline/
 │   ├── raw/
 │   │   └── benefits_enrollments.csv
 │   ├── test/
-│   │   └── benefits_enrollments_invalid.csv
+│   │   ├── benefits_enrollments_invalid.csv
+│   │   └── accepted_enrollments_integration.csv
 │   └── processed/
 │       ├── accepted_enrollments.csv
 │       ├── rejected_enrollments.csv
@@ -194,13 +199,18 @@ BenefitAnalyticsPipeline/
 │   │   └── reconcile_enrollments.py
 │   └── run_pipeline.py
 ├── tests/
-│   └── test_validate_enrollments.py
+│   ├── test_validate_enrollments.py
+│   └── test_load_enrollments_integration.py
+├── .github/
+│   └── workflows/
+│       └── python-tests.yml
 ├── reports/
 │   └── Benefits_Analytics_Dashboard.pbix
 ├── sql/
 │   └── create_schema.sql
 ├── README.md
 ├── requirements.txt
+├── pytest.ini
 └── .gitignore
 ```
 
@@ -213,7 +223,9 @@ BenefitAnalyticsPipeline/
 - **src/transform/** — pandas validation and analytics.
 - **src/load/** — PostgreSQL database loading and connection testing scripts.
 - **src/validation/** — Post-load database reconciliation.
-- **tests/** — Automated pytest validation tests.
+- **tests/** — Automated pytest validation and PostgreSQL integration tests.
+- **.github/workflows/** — GitHub Actions workflow for unit tests.
+- **pytest.ini** — pytest test discovery and integration-test marker configuration.
 - **reports/** — Power BI Desktop dashboard.
 - **sql/** — PostgreSQL database schema creation script, including tables, primary keys, foreign keys, and constraints.
 
@@ -526,32 +538,17 @@ assert len(df) == len(accepted_df) + len(rejected_df)
 This confirms that each input record is accounted for in either the accepted or rejected output.
 
 
-## Automated Testing
+## Automated Testing and Continuous Integration
 
-The project uses pytest to test enrollment validation logic
-independently of CSV file operations and PostgreSQL.
+The project uses pytest to verify enrollment validation rules and
+PostgreSQL enrollment loading. The two types of tests are separated
+so routine unit testing does not require a running database.
 
-The automated tests are located in:
+### Unit Tests
 
-`tests/test_validate_enrollments.py`
-
-### Running the Tests
-
-Install the project dependencies:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-Run the automated validation tests:
-
-```powershell
-python -m pytest tests/test_validate_enrollments.py -v
-```
-
-### Test Coverage
-
-The test suite contains seven automated tests:
+`tests/test_validate_enrollments.py` contains seven tests using
+in-memory pandas DataFrames and the production
+`validate_enrollments(df)` function.
 
 | Test Scenario | Expected Behavior |
 |---|---|
@@ -563,21 +560,80 @@ The test suite contains seven automated tests:
 | Missing or whitespace-only source enrollment ID | Reject enrollment |
 | Negative employee monthly cost | Reject enrollment |
 
-The tests use in-memory pandas DataFrames and call the
-production `validate_enrollments(df)` function directly.
+Run the default test suite from the project root:
 
-This separates validation business logic from file I/O,
-making the code easier to test and maintain.
+```powershell
+python -m pytest tests/ -v
+```
 
-### Latest Verified Results
+The `pytest.ini` configuration excludes tests marked `integration`
+by default. The latest verified default run reported **7 passed,
+1 deselected**.
 
-All seven automated validation tests passed during the
-November 18, 2026 development session.
+### PostgreSQL Integration Test
 
-These tests cover the core validation rules. They do not
-yet constitute full automated integration testing of
-PostgreSQL loading or Power BI reporting.
+`tests/test_load_enrollments_integration.py` verifies that the
+enrollment loader is idempotent: the first load inserts a fixture
+enrollment and a repeated load does not create a duplicate.
 
+The test uses an isolated `benefits_analytics_test` database and
+`data/test/accepted_enrollments_integration.csv`. It requires a
+running PostgreSQL instance, the project schema, the fixture's
+referenced employee and benefit plan, and a database password.
+
+For a new test database, create the database and restore the schema
+using the instructions in **PostgreSQL Configuration**, substituting
+`benefits_analytics_test` for `benefits_analytics`. Seed the referenced
+employee, department, and benefit plan before running the test.
+
+In Windows PowerShell, configure the environment for the isolated
+test database:
+
+```powershell
+$env:DB_NAME = "benefits_analytics_test"
+$env:INTEGRATION_TEST = "1"
+$env:ENROLLMENTS_CSV = "data/test/accepted_enrollments_integration.csv"
+$env:DB_PASSWORD = Read-Host "Enter PostgreSQL password"
+```
+
+Run only the integration test:
+
+```powershell
+python -m pytest tests/ -v -m integration
+```
+
+To run both unit and integration tests together (with the same
+test database configuration):
+
+```powershell
+python -m pytest tests/ -v -m ""
+```
+
+The loader includes a safety guard that prevents integration-test
+mode from targeting a database other than `benefits_analytics_test`.
+Never run the integration test against the normal project database.
+
+### GitHub Actions CI
+
+The workflow at `.github/workflows/python-tests.yml` runs on pushes
+to `main` and pull requests targeting `main`. It checks out the
+repository, configures Python 3.13, installs `requirements.txt`,
+and executes:
+
+```bash
+python -m pytest tests/ -v
+```
+
+CI deliberately runs only the seven unit tests. The PostgreSQL
+integration test remains a separate, explicit local test and does
+not require database credentials in GitHub Actions.
+
+**Latest verified CI run (November 19, 2026):** GitHub Actions
+workflow #2 succeeded after upgrading to `actions/checkout@v6`
+and `actions/setup-python@v6`. The previous Node.js 20 deprecation
+warning was not displayed on the new run summary.
+
+[View GitHub Actions workflow runs](https://github.com/jdub2233/BenefitAnalyticsPipeline/actions/workflows/python-tests.yml)
 
 
 ## PostgreSQL Integration
@@ -725,7 +781,7 @@ python src/transform/analyze_benefits.py
 | Total employee monthly cost | $2,273.00 | $1,553.00 |
 | Financial reconciliation | Passed | Passed |
 
-This demonstrates that invalid records are excluded from downstream analytics. This historical CSV integration test was performed manually. Automated pytest tests now cover the seven core validation rules; database integration testing remains a future enhancement.
+This demonstrates that invalid records are excluded from downstream analytics. This historical CSV integration test was performed manually. Automated pytest tests now cover the seven core validation rules, and a separate PostgreSQL integration test verifies idempotent enrollment loading.
 
 **Note:** Running the validator with the invalid test dataset overwrites the generated accepted/rejected CSVs, and the analytics script overwrites the generated cost report.
 
@@ -885,9 +941,11 @@ Planned improvements include:
 - [x] Add seven automated pytest validation tests
 - [x] Verify PostgreSQL reconciliation
 - [x] Test detection of database discrepancies
-- [ ] Expand automated testing to database loading
+- [x] Add PostgreSQL enrollment-loading integration test
 - [ ] Improve logging and error handling
-- [ ] Add automated integration tests
+- [x] Separate unit and integration tests using pytest markers
+- [x] Add GitHub Actions CI for unit tests
+- [x] Upgrade GitHub Actions to Node.js 24-compatible versions
 - [ ] Finalize project documentation
 
 ### Phase 6: Microsoft Fabric — Planned
@@ -918,23 +976,25 @@ No real employee records or protected health information are used.
 
 **Started:** October 26, 2026
 
-**Latest Verified Progress:** November 18, 2026
+**Latest Verified Progress:** November 19, 2026
 
 ### Current Capabilities
 
 The project includes a working seven-stage ETL pipeline
-with Python, pandas, PostgreSQL, automated validation tests,
-database reconciliation, and an interactive Power BI dashboard.
+with Python, pandas, PostgreSQL, automated validation and database
+integration tests, GitHub Actions CI, database reconciliation, and
+an interactive Power BI dashboard.
 
 The latest verified execution processed 21 accepted
 enrollment records with zero reconciliation discrepancies.
 
-All seven automated pytest validation tests passed.
+All seven automated pytest validation tests passed in GitHub Actions;
+the separate PostgreSQL integration test also passed locally.
 
 ### Current Development Focus
 
 - Pipeline reliability and documentation
-- Expanded automated testing
+- Broader pipeline reliability testing and improved logging
 - Microsoft Fabric integration
 - Future Power BI connectivity improvements
 

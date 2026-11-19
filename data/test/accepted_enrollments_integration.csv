@@ -1,0 +1,2 @@
+employee_id,employee_name,department,plan_type,monthly_premium,employee_monthly_cost,source_enrollment_id,effective_date
+9999,Test Employee,Integration Test Department,Medical,500,150,TEST-ENR-9999-001,2026-01-01

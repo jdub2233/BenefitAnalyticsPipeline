@@ -198,7 +198,7 @@ BenefitAnalyticsPipeline/
 ├── reports/
 │   └── Benefits_Analytics_Dashboard.pbix
 ├── sql/
-│   └── .gitkeep
+│   └── create_schema.sql
 ├── README.md
 ├── requirements.txt
 └── .gitignore
@@ -215,7 +215,7 @@ BenefitAnalyticsPipeline/
 - **src/validation/** — Post-load database reconciliation.
 - **tests/** — Automated pytest validation tests.
 - **reports/** — Power BI Desktop dashboard.
-- **sql/** — Reserved for PostgreSQL database schema scripts. Schema creation scripts have not yet been added to the repository.
+- **sql/** — PostgreSQL database schema creation script, including tables, primary keys, foreign keys, and constraints.
 
 Generated files under `data/processed/` are excluded from Git tracking and recreated when the pipeline runs.
 ```
@@ -266,37 +266,101 @@ python -m pip install -r requirements.txt
 All commands below assume the virtual environment is activated and commands are run from the project root.
 
 
+
 ### PostgreSQL Configuration
 
-The ETL pipeline requires a running PostgreSQL instance.
+The ETL pipeline requires PostgreSQL and a database named
+`benefits_analytics`.
 
-Before executing the complete pipeline:
+The repository includes a schema-only SQL script:
 
-1. Install and start PostgreSQL.
-2. Create a database named `benefits_analytics`.
-3. Ensure the required database tables have been created.
-4. Configure the PostgreSQL connection credentials.
+`sql/create_schema.sql`
 
-The Python database loading scripts read the PostgreSQL
-password from the `DB_PASSWORD` environment variable.
+This script creates the four required tables:
 
-For Windows PowerShell:
+- `departments`
+- `employees`
+- `benefit_plans`
+- `enrollments`
+
+It also creates the primary keys, foreign keys, unique
+constraints, and check constraints required by the pipeline.
+
+#### 1. Create the Database
+
+Connect to PostgreSQL using psql:
+
+```powershell
+psql -h localhost -U postgres -d postgres
+```
+
+Run:
+
+```sql
+CREATE DATABASE benefits_analytics;
+```
+
+Exit psql:
+
+```text
+\q
+```
+
+#### 2. Create the Database Schema
+
+From the project root, run:
+
+```powershell
+psql -h localhost -U postgres -d benefits_analytics -v ON_ERROR_STOP=1 -f ".\sql\create_schema.sql"
+```
+
+This command creates the required database tables
+and constraints.
+
+**Important:** Run the schema script against a new,
+empty database. Do not run it against an existing
+database containing the project's tables.
+
+#### 3. Configure the Database Password
+
+The Python database loading scripts use the
+`DB_PASSWORD` environment variable.
+
+In Windows PowerShell:
 
 ```powershell
 $env:DB_PASSWORD = Read-Host "Enter PostgreSQL password"
 ```
 
-This sets the environment variable for the current
+The environment variable applies to the current
 PowerShell session.
 
-The password must be configured again when opening a new
-terminal session.
+Never commit database credentials to GitHub.
 
-**Security:** Do not store database passwords in source
-code or commit credentials to GitHub.
+#### 4. Run the Pipeline
 
-The pipeline requires PostgreSQL to be running and the
-database schema to exist before database loading begins.
+```powershell
+python src/run_pipeline.py
+```
+
+The pipeline validates enrollment data, generates
+analytics, loads PostgreSQL tables, and reconciles
+database records against the accepted CSV.
+
+### Schema Verification
+
+The schema script was successfully restored into a
+separate PostgreSQL 18.4 test database.
+
+Verification confirmed:
+
+- Four tables created successfully.
+- 27 database constraints present.
+- All four tables initially empty.
+- No SQL errors during restoration.
+
+The test database was used only to verify schema
+reproducibility; the working database was not modified.
 
 
 ### Run the Complete Pipeline
@@ -772,7 +836,6 @@ Planned improvements include:
 - Expanding dashboard analytics and reporting.
 
 
-
 ## Development Roadmap
 
 ### Phase 1: Project Foundation — Complete
@@ -803,6 +866,9 @@ Planned improvements include:
 - [x] Implement seven-stage ETL orchestration
 - [x] Add PostgreSQL-to-CSV reconciliation
 - [x] Verify repeatable pipeline execution
+- [x] Export PostgreSQL schema to a version-controlled SQL script
+- [x] Verify schema restoration in a separate test database
+
 
 ### Phase 4: Power BI — Initial Dashboard Complete
 

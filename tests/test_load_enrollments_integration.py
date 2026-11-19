@@ -89,7 +89,7 @@ def run_enrollment_loader():
 
     return result.stdout
 
-
+@pytest.mark.integration
 def test_enrollment_loader_is_idempotent(clean_test_enrollment):
     # Safety: integration tests must use the isolated database.
     assert os.environ.get("DB_NAME") == TEST_DB_NAME
